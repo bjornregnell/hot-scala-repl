@@ -1,2 +1,2 @@
 # hot-scala-repl
-Hot Scala REPL responding at before youre eyes blink.
+Hot Scala REPL responding before your eyes blink.

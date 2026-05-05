@@ -8,10 +8,10 @@ Send strings from args or stdin to a persistent background Scala REPL, avoiding 
 
 `hot-scala-repl.scala` keeps a `scala repl` process running in the background using:
 
-- A **named pipe (FIFO)** at `~/-hot-scala-repl/input.fifo` — the REPL reads input from it. The FIFO is opened read-write (`0<>`) so the REPL never sees EOF.
-- A **PID file** at `~/-hot-scala-repl/pid` — used to detect whether the REPL is still alive (`kill -0`).
-- A **dir file** at `~/-hot-scala-repl/dir` — remembers the project directory the REPL was started with. If `--path` changes, the REPL is automatically killed and restarted.
-- An **output log** at `~/-hot-scala-repl/output.log` — captures the REPL's stdout/stderr.
+- A **named pipe (FIFO)** at `~/.hot-scala-repl/input.fifo` — the REPL reads input from it. The FIFO is opened read-write (`0<>`) so the REPL never sees EOF.
+- A **PID file** at `~/.hot-scala-repl/pid` — used to detect whether the REPL is still alive (`kill -0`).
+- A **dir file** at `~/.hot-scala-repl/dir` — remembers the project directory the REPL was started with. If `--path` changes, the REPL is automatically killed and restarted.
+- An **output log** at `~/.hot-scala-repl/output.log` — captures the REPL's stdout/stderr.
 
 On the first invocation the REPL is started (takes ~3s). Subsequent calls detect the running process, write to the FIFO, and stream output back by polling the log file every 20ms until the `scala> ` prompt reappears.
 
@@ -25,7 +25,7 @@ On the first invocation the REPL is started (takes ~3s). Subsequent calls detect
 ./hsr --path my/projdir/path "println(42)"
 
 # If the dir changes, the REPL is automatically restarted
-./hsr --path other/project "println(99)"
+./hsr --path other/project 
 
 # Pipe from stdin
 echo "val x = 42; x * x" | ./hsr

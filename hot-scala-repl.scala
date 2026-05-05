@@ -15,6 +15,9 @@ val fifoPath = stateDir / "input.fifo"
 /** Log file capturing the REPL's stdout and stderr. */
 val logPath  = stateDir / "output.log"
 
+/** Max time to wait for the REPL's first `scala> ` prompt. */
+val StartupTimeoutMillis = 30000
+
 /** Stores the project directory the current REPL was started with. */
 val dirFile  = stateDir / "dir"
 
@@ -28,36 +31,44 @@ def isReplProcessRunning(): Boolean =
 def savedDir(): Option[String] =
   if os.exists(dirFile) then Some(os.read(dirFile).trim).filter(_.nonEmpty) else None
 
+extension (s: String) def wrapInSingleQuotes: String = { val q = s.replace("'", "'\\''"); s" '$q'" }
+
 /** Creates the FIFO, launches `scala repl [dir]` in the background, and waits for it to be ready. */
-def startReplProcess(dir: Option[String] = None): Unit =
+def startReplProcess(dir: String): Unit =
   os.makeDir.all(stateDir)
   if os.exists(fifoPath) then os.remove(fifoPath)
   os.proc("mkfifo", fifoPath.toString).call()
   os.write.over(logPath, "")
-  os.write.over(dirFile, dir.getOrElse(""))
-  val dirArg = dir.fold("") { d => val q = d.replace("'", "'\\''"); s" '$q'" }
+  os.write.over(dirFile, dir)
+  val dirArg = if dir.isEmpty then "" else dir.wrapInSingleQuotes
+
   // Open FIFO read-write (0<>) so the REPL never sees EOF
   os.proc("bash", "-c",
-    s"""nohup scala repl$dirArg 0<>"$fifoPath" >>"$logPath" 2>&1 &
-       |echo $$! > "$pidFile"""".stripMargin
+    s"""|nohup scala repl$dirArg 0<>"$fifoPath" >>"$logPath" 2>&1 &
+        |echo $$! > "$pidFile"""".stripMargin
   ).call()
-  System.err.println("Waiting for REPL to start" + dir.fold("")(d => s" ($d)") + "...")
-  Thread.sleep(3000)
-  System.err.println("REPL started (pid " + os.read(pidFile).trim + ")")
+  
+  val pid = os.read(pidFile).trim
+  System.err.println(s"Waiting for REPL to start (pid $pid)...")
+  val deadline = System.currentTimeMillis() + StartupTimeoutMillis
+  while !os.read(logPath).contains("scala> ") do
+    if System.currentTimeMillis() > deadline then
+      System.err.println("Timed out waiting for REPL prompt.")
+      return
+    Thread.sleep(100)
+  System.err.println("REPL ready.")
 
-/** Ensures the REPL is running with the requested project dir, restarting if the dir changed. */
-def ensureRepl(dir: Option[String] = None): Unit =
-  if isReplProcessRunning() then
-    if dir.isDefined && dir != savedDir() then
-      System.err.println("Project dir changed, restarting REPL...")
-      killReplProcess()
-      startReplProcess(dir)
+/** Update project dir, restarting if the dir changed. */
+def updateDir(newDir: String): Unit =
+  if savedDir() != Some(newDir) then 
+    killReplProcess()
+    startReplProcess(newDir)
   else
-    startReplProcess(dir)
+    System.err.println(s"Project unchanged.")
 
 /** Sends lines to the REPL via the FIFO and streams output until the `scala> ` prompt returns. */
-def sendToReplProcessStdIn(lines: Seq[String], dir: Option[String] = None): Unit =
-  ensureRepl(dir)
+def sendToReplProcessStdIn(lines: Seq[String]): Unit =
+  if !isReplProcessRunning() then startReplProcess(savedDir().getOrElse(""))
   val sizeBefore = if os.exists(logPath) then os.size(logPath) else 0L
   val writer = FileWriter(fifoPath.toIO)
   try
@@ -108,31 +119,20 @@ def killReplProcess(): Unit =
   else
     System.err.println("No REPL process running")
   if os.exists(fifoPath) then os.remove(fifoPath)
-  if os.exists(dirFile) then os.remove(dirFile)
-
-/** Extracts --path <dir> from args, returning (Option[dir], remaining args). */
-def extractPath(args: List[String]): (Option[String], List[String]) =
-  args match
-    case "--path" :: dir :: rest => (Some(dir), rest)
-    case other :: rest =>
-      val (dir, remaining) = extractPath(rest)
-      (dir, other :: remaining)
-    case Nil => (None, Nil)
 
 /** Entry point. Dispatches --kill, --tail, --path, stdin, or args to the background REPL. */
 @main def hotScalaRepl(args: String*): Unit =
-  val (dir, rest) = extractPath(args.toList)
-  rest match
-    case List("--kill") =>
+  args match
+    case Seq("--kill") =>
       killReplProcess()
-    case List("--tail") =>
+    case Seq("--tail") =>
       if os.exists(logPath) then
         os.proc("tail", "-f", logPath.toString).call(stdout = os.Inherit)
       else
         System.err.println("No output log found. Start the REPL first.")
-    case Nil =>
-      val lines = scala.io.Source.stdin.getLines().toSeq
-      if lines.nonEmpty then sendToReplProcessStdIn(lines, dir)
-      else ensureRepl(dir)
+    case "--path" +: rest =>
+      val newPath = rest.mkString(" ")
+      println(s"Old path: ${savedDir()}\nNew path: $newPath")
+      updateDir(newPath)
     case _ =>
-      sendToReplProcessStdIn(Seq(rest.mkString(" ")), dir)
+      sendToReplProcessStdIn(Seq(args.mkString(" ")))

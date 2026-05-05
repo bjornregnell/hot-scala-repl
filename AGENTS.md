@@ -39,12 +39,4 @@ echo "val x = 42; x * x" | ./hsr
 
 ## Building a native binary
 
-See README.md for how to build a native binary
-
-```bash
-scala-cli --power package hot-scala-repl.scala -o hsr -f --native-image \
-  --graalvm-jvm-id graalvm-java25:25.0.1 \
-  -- --no-fallback -H:+ReportExceptionStackTraces --initialize-at-build-time
-```
-
-This produces a ~15 MB standalone ELF binary in `./hsr`. GraalVM is downloaded automatically by scala-cli. The binary starts instantly (~87ms for a hot REPL call). The background REPL itself still requires `scala` on PATH.
+Run `./package.sh` to build a native binary. This produces a ~15 MB standalone ELF binary in `./hsr`. GraalVM is downloaded automatically by scala-cli. The binary starts instantly (~87ms for a hot REPL call). The background REPL itself still requires `scala` on PATH.

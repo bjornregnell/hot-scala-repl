@@ -39,4 +39,8 @@ echo "val x = 42; x * x" | ./hsr
 
 ## Building a native binary
 
-Run `./package.sh` to build a native binary. This produces a ~15 MB standalone ELF binary in `./hsr`. GraalVM is downloaded automatically by scala-cli. The binary starts instantly (~87ms for a hot REPL call). The background REPL itself still requires `scala` on PATH.
+Run `./package.sh` to build a native binary. This produces a ~15 MB standalone ELF binary in `./hsr`. GraalVM (Java 21 LTS) is downloaded automatically by scala-cli. If `cs` (coursier) is on PATH, the script auto-detects the latest `graalvm-java21` version; otherwise it falls back to a hardcoded version. The binary starts instantly (~87ms for a hot REPL call). The background REPL itself still requires `scala` on PATH.
+
+## Publishing a release
+
+This requires write access to the repository. Run `./publish.sh` to create a GitHub release (requires `gh` CLI). It copies `hsr` to `hsr-linux-amd64`, creates a tagged release, and uploads the binary. Bump the `VERSION` variable in `publish.sh` before each release.

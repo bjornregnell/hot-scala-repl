@@ -134,5 +134,8 @@ def killReplProcess(): Unit =
       val newPath = rest.mkString(" ")
       println(s"Old path: ${savedDir()}\nNew path: $newPath")
       updateDir(newPath)
+    case Seq() =>
+      val lines = scala.io.Source.stdin.getLines().toSeq
+      if lines.nonEmpty then sendToReplProcessStdIn(lines)
     case _ =>
       sendToReplProcessStdIn(Seq(args.mkString(" ")))

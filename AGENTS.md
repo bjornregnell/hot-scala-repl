@@ -39,6 +39,8 @@ echo "val x = 42; x * x" | ./hsr
 
 ## Building a native binary
 
+See README.md for how to build a native binary
+
 ```bash
 scala-cli --power package hot-scala-repl.scala -o r -f --native-image \
   --graalvm-jvm-id graalvm-java25:25.0.1 \
